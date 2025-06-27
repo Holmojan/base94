@@ -42,7 +42,7 @@ protected:
 		0,0,8,7,6,5,0,4,3,2, 1	//9-input_tail
 	};
 
-	typedef uint8_t base94_input_block[BASE94_INPUT_BLOCK_SIZE];
+	typedef unsigned char base94_input_block[BASE94_INPUT_BLOCK_SIZE];
 	typedef char base94_output_block[BASE94_OUTPUT_BLOCK_SIZE];
 
 	inline static bool encode_symbol(uint32_t x, char& y) {
@@ -105,49 +105,53 @@ protected:
 		return true;
 	}
 public:
-	static bool encode(const std::vector<uint8_t>& /*int*/v, std::string& /*out*/s) {
-		uint32_t block_count = (v.size() + BASE94_INPUT_BLOCK_SIZE - 1) / BASE94_INPUT_BLOCK_SIZE;
+	static bool encode(const std::string& /*in*/p, std::string& /*out*/c) {
+		uint32_t block_count = (p.size() + BASE94_INPUT_BLOCK_SIZE - 1) / BASE94_INPUT_BLOCK_SIZE;
 		uint32_t buffer_size = block_count * BASE94_OUTPUT_BLOCK_SIZE;
-		uint32_t tail = v.size() % BASE94_INPUT_BLOCK_SIZE;
-		s.resize(buffer_size);
+		uint32_t tail = p.size() % BASE94_INPUT_BLOCK_SIZE;
+		std::string t;
+		t.resize(buffer_size);
 		uint32_t off_v = 0, off_s = 0;
-		for (; off_v + BASE94_INPUT_BLOCK_SIZE <= v.size(); off_v += BASE94_INPUT_BLOCK_SIZE, off_s += BASE94_OUTPUT_BLOCK_SIZE) {
-			if (!encode_block(*(base94_input_block*)(v.data() + off_v), *(base94_output_block*)(s.data() + off_s)))
+		for (; off_v + BASE94_INPUT_BLOCK_SIZE <= p.size(); off_v += BASE94_INPUT_BLOCK_SIZE, off_s += BASE94_OUTPUT_BLOCK_SIZE) {
+			if (!encode_block(*(base94_input_block*)(p.data() + off_v), *(base94_output_block*)(t.data() + off_s)))
 				return false;
 		}
 		if (tail > 0) {
 			base94_input_block buff = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 			for (uint32_t i = 0; i < tail; i++)
-				buff[i] = v[off_v + i];
-			if (!encode_block(buff, *(base94_output_block*)(s.data() + off_s)))
+				buff[i] = p[off_v + i];
+			if (!encode_block(buff, *(base94_output_block*)(t.data() + off_s)))
 				return false;
-			s.resize(buffer_size - encode_tail_cut[tail]);
+			t.resize(buffer_size - encode_tail_cut[tail]);
 		}
+		c = std::move(t);
 		return true;
 	}
-	static bool decode(const std::string& /*in*/s, std::vector<uint8_t>& /*out*/v) {
-		uint32_t block_count = (s.size() + BASE94_OUTPUT_BLOCK_SIZE - 1) / BASE94_OUTPUT_BLOCK_SIZE;
+	static bool decode(const std::string& /*in*/c, std::string& /*out*/p) {
+		uint32_t block_count = (c.size() + BASE94_OUTPUT_BLOCK_SIZE - 1) / BASE94_OUTPUT_BLOCK_SIZE;
 		uint32_t buffer_size = block_count * BASE94_INPUT_BLOCK_SIZE;
-		uint32_t tail = s.size() % BASE94_OUTPUT_BLOCK_SIZE;
+		uint32_t tail = c.size() % BASE94_OUTPUT_BLOCK_SIZE;
 
 		if (tail > 0 && decode_tail_cut[tail] == 0)
 			return false;
 
-		v.resize(buffer_size);
+		std::string t;
+		t.resize(buffer_size);
 		uint32_t off_s = 0, off_v = 0;
-		for (; off_s + BASE94_OUTPUT_BLOCK_SIZE <= s.size(); off_s += BASE94_OUTPUT_BLOCK_SIZE, off_v += BASE94_INPUT_BLOCK_SIZE) {
-			if (!decode_block(*(base94_output_block*)(s.data() + off_s), *(base94_input_block*)(v.data() + off_v)))
+		for (; off_s + BASE94_OUTPUT_BLOCK_SIZE <= c.size(); off_s += BASE94_OUTPUT_BLOCK_SIZE, off_v += BASE94_INPUT_BLOCK_SIZE) {
+			if (!decode_block(*(base94_output_block*)(c.data() + off_s), *(base94_input_block*)(t.data() + off_v)))
 				return false;
 		}
 		if (tail > 0) {
 			base94_output_block buff = { first_symbol, first_symbol, first_symbol, first_symbol, first_symbol,
 				first_symbol, first_symbol, first_symbol, first_symbol, first_symbol, first_symbol };
 			for (uint32_t i = 0; i < tail; i++)
-				buff[i] = s[off_v + i];
-			if (!decode_block(buff, *(base94_input_block*)(v.data() + off_v)))
+				buff[i] = c[off_s + i];
+			if (!decode_block(buff, *(base94_input_block*)(t.data() + off_v)))
 				return false;
-			v.resize(buffer_size - decode_tail_cut[tail]);
+			t.resize(buffer_size - decode_tail_cut[tail]);
 		}
+		p = std::move(t);
 		return true;
 	}
 };
